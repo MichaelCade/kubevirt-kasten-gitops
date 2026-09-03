@@ -116,6 +116,19 @@ Optionally pin per-StorageClass instead:
 kubectl annotate storageclass ceph-block k10.kasten.io/volume-snapshot-class=csi-rbdplugin-snapclass
 ```
 
+**c. Enable block-mode export on your RBD StorageClass.** VM root disks are `volumeMode: Block`, and exporting a raw block volume to a Location Profile is opt-in per StorageClass. Without this, snapshots/local restore points still work but the `export` action fails with *"volume's storage class does not support block mode export"*.
+
+```bash
+kubectl annotate storageclass ceph-block k10.kasten.io/sc-supports-block-mode-exports=true
+```
+
+**d. If Kasten was installed before KubeVirt, restart its services.** Kasten only enables VM discovery when it detects the KubeVirt API. If K10 predates your KubeVirt install, a VM policy validates fine but matches zero subjects (executor logs show no child jobs; a run reports *"No restore points to export"*). Bounce the discovery/detection services once:
+
+```bash
+kubectl rollout restart deploy/catalog-svc deploy/dashboardbff-svc \
+  deploy/executor-svc deploy/aggregatedapis-svc deploy/state-svc -n kasten-io
+```
+
 Sanity-check the whole storage path with Kasten's preflight tool:
 
 ```bash
@@ -251,6 +264,9 @@ CDI scratch space is always a **Filesystem** PVC even when the target disk is Bl
 | `no matches for kind "Policy"` | Aggregated API unavailable | `kubectl get apiservice v1alpha1.config.kio.kasten.io` |
 | ArgoCD keeps re-syncing the VM | KubeVirt writes `/status`, CDI mutates the PVC | `ignoreDifferences` (already in this repo) |
 | Backup is crash-consistent | No `qemu-guest-agent` in the guest | Install + enable in cloud-init |
+| VM policy runs but backs up nothing ("No restore points to export"; executor queues no children) | Kasten was installed **before** KubeVirt, so it never enabled VM discovery | `kubectl rollout restart deploy/catalog-svc deploy/dashboardbff-svc deploy/executor-svc deploy/aggregatedapis-svc deploy/state-svc -n kasten-io`, then re-run |
+| Export fails: "volume's storage class does not support block mode export" | Block-mode volume export is opt-in per StorageClass | `kubectl annotate storageclass ceph-block k10.kasten.io/sc-supports-block-mode-exports=true` |
+| CDI import to RBD **block** fails: `blockdev: cannot open /dev/cdi-block-volume: Permission denied` | Non-root importer vs root:root 0600 block device | Seed the boot PVC out-of-band (`hack/seed-boot-disk.sh`) and boot from it; see `workloads/fedora-vm/pvc.yaml` |
 | CDI import pod OOMKilled | Default CDI limits too low | `podResourceRequirements` (already raised here) |
 | NFS-backed PVC hangs | Talos has no `rpc.statd` | `nolock` mount option (only if you use NFS anywhere) |
 
