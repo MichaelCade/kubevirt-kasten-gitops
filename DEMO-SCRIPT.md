@@ -11,9 +11,11 @@
 
 Show two windows: your Git repo, and the ArgoCD UI with the app-of-apps tree fully green.
 
-> "Six ArgoCD Applications. A snapshot class, KubeVirt, CDI, Kasten's configuration, and one virtual machine. Ceph and Kasten were already here. I ran exactly one imperative command to get the rest — `kubectl apply -f bootstrap/root-app.yaml`. Everything after that came from Git."
+> "Five ArgoCD Applications. KubeVirt, CDI, Kasten's configuration, and one virtual machine. Ceph, its snapshot class, and Kasten were already here. I ran exactly one imperative command to get the rest — `kubectl apply -f bootstrap/root-app.yaml`. Everything after that came from Git."
 
-Click into `demo-vm`. Point at the resource tree: `VirtualMachine` → `DataVolume` → `PersistentVolumeClaim`.
+Click into `demo-vm`. Point at the resource tree: `VirtualMachine` → `PersistentVolumeClaim`.
+
+> (If asked about the disk: the VM boots from an RBD Block RWX PVC that's declared in Git; its *contents* — the Fedora image — were seeded once out-of-band, the same way the S3 credential is. On this cluster CDI's non-root importer can't write a raw RBD block device, so the golden image is laid down by a privileged one-shot job. The VM still runs on RBD Block RWX, so live-migration still works.)
 
 > "That's a Fedora VM. To Kubernetes it's a custom resource. To ArgoCD it's just another object to reconcile. Which means it gets pull requests, code review, and rollback like anything else."
 
@@ -43,7 +45,7 @@ kubectl delete vm fedora-vm -n demo-vms
 
 Watch ArgoCD go OutOfSync and self-heal it back. Then make the point:
 
-> "Notice what it recreated: the VM definition. Not the data. The DataVolume was pruned with it and the disk gets rebuilt from the source image. Git gives you back the *shape* of the VM. It does not give you back what was inside it. That's the gap."
+> "ArgoCD recreated the VM definition within seconds — that's reconciliation, not a backup. But notice it only ever had the *shape* of the VM: the manifest, the labels, the PVC declaration. Git never held what was *inside* the disk. Here the boot PVC happens to persist, so the VM comes back with its data — but that's Ceph keeping the volume, not Git. Delete the PVC too (Act 5) and Git gives you a blank disk. That's the gap Kasten fills."
 
 ## Act 3 — Protection, also from Git (4 min)
 

@@ -7,9 +7,9 @@ metadata:
     app: fedora-vm
     backup: hourly          # picked up by policy-vm-by-label.yaml
 spec:
-  # Halted for the initial bring-up so the VM never boots a blank disk before the
-  # boot PVC is seeded (hack/seed-boot-disk.sh). Flip to Always once seeded.
-  runStrategy: Halted
+  # Boot PVC is seeded (hack/seed-boot-disk.sh); run the VM. On a fresh cluster,
+  # seed the PVC first, then set this to Always.
+  runStrategy: Always
   template:
     metadata:
       labels:
