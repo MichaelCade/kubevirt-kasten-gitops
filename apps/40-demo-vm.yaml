@@ -9,7 +9,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: REPO_URL
+    repoURL: https://github.com/MichaelCade/kubevirt-kasten-gitops.git
     targetRevision: main
     path: workloads/fedora-vm
   destination:

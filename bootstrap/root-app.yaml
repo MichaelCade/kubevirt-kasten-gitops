@@ -10,7 +10,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: REPO_URL          # <-- replace with your Git repo
+    repoURL: https://github.com/MichaelCade/kubevirt-kasten-gitops.git          # <-- replace with your Git repo
     targetRevision: main
     path: apps
   destination:
