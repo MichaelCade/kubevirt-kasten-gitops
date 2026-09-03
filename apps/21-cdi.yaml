@@ -23,9 +23,12 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
   ignoreDifferences:
+    # The CDI operator reconciles its own CRDs at runtime to a shape that differs
+    # from the static release manifest (extra served versions, generation bumps).
+    # Let the operator own those fields so ArgoCD doesn't flap OutOfSync forever.
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
-      jsonPointers: ["/status"]
+      jsonPointers: ["/status", "/spec/versions", "/metadata/generation"]
     - group: cdi.kubevirt.io
       kind: CDI
       jsonPointers: ["/status"]
