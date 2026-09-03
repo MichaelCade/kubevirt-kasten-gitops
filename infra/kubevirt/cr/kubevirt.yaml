@@ -1,0 +1,23 @@
+apiVersion: kubevirt.io/v1
+kind: KubeVirt
+metadata:
+  name: kubevirt
+  namespace: kubevirt
+spec:
+  certificateRotateStrategy: {}
+  imagePullPolicy: IfNotPresent
+  configuration:
+    developerConfiguration:
+      featureGates:
+        - LiveMigration
+        - Snapshot            # VirtualMachineSnapshot CRs - handy for comparison in the demo
+        - HotplugVolumes
+    smbios:
+      manufacturer: "Talos Virtualization"
+      product: "talosvm"
+      family: "ccio"
+      sku: "TalosCloud"
+      version: "v0.1.0"
+  workloadUpdateStrategy:
+    workloadUpdateMethods:
+      - LiveMigrate           # requires RWX storage (ceph-block in Block mode)

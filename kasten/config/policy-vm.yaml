@@ -1,0 +1,42 @@
+# The whole point of the demo: VM data protection declared as YAML in Git.
+#
+# k10.kasten.io/virtualMachineRef selects individual VMs (namespace/name, the name
+# half supports wildcards). This gives one BackupAction and one RestorePoint PER VM
+# rather than one lumped per-namespace restore point - the recommended model.
+#
+# Kasten walks the VM's dependency graph automatically: VirtualMachine,
+# VirtualMachineInstance, instancetype/preference, DataVolumes -> PVCs ->
+# StorageClasses, ConfigMaps, Secrets, ServiceAccounts, NetworkAttachmentDefinitions.
+# You do NOT need a Blueprint for VM consistency.
+apiVersion: config.kio.kasten.io/v1alpha1
+kind: Policy
+metadata:
+  name: fedora-vm-protection
+  namespace: kasten-io
+spec:
+  comment: Hourly snapshot + daily export of the GitOps-deployed Fedora VM
+  frequency: '@hourly'
+  retention:
+    hourly: 24
+    daily: 7
+  actions:
+    - action: backup
+    - action: export
+      exportParameters:
+        frequency: '@daily'
+        profile:
+          name: kasten-backups
+          namespace: kasten-io
+        exportData:
+          enabled: true
+      retention:
+        daily: 7
+        weekly: 4
+  selector:
+    matchExpressions:
+      - key: k10.kasten.io/virtualMachineRef
+        operator: In
+        values:
+          - "demo-vms/fedora-vm"
+          # or catch every VM in the namespace:
+          # - "demo-vms/*"

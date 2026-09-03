@@ -1,0 +1,23 @@
+# Wave 2 - the KubeVirt CR that tells the operator to actually deploy KubeVirt.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubevirt-cr
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    repoURL: REPO_URL
+    targetRevision: main
+    path: infra/kubevirt/cr
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kubevirt
+  syncPolicy:
+    automated: {prune: false, selfHeal: true}
+  ignoreDifferences:
+    - group: kubevirt.io
+      kind: KubeVirt
+      jsonPointers: ["/status", "/spec/imagePullPolicy"]

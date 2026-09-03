@@ -1,0 +1,16 @@
+# OPTIONAL - only if you also protect CephFS-backed (RWX filesystem) PVCs.
+# Rule 1 above is per-provisioner: CephFS and RBD are different provisioners, so
+# both may be annotated - just never two RBD classes.
+# Rename to .yaml to enable.
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: csi-cephfsplugin-snapclass
+  annotations:
+    k10.kasten.io/is-snapshot-class: "true"
+driver: rook-ceph.cephfs.csi.ceph.com
+deletionPolicy: Delete
+parameters:
+  clusterID: rook-ceph
+  csi.storage.k8s.io/snapshotter-secret-name: rook-csi-cephfs-provisioner
+  csi.storage.k8s.io/snapshotter-secret-namespace: rook-ceph

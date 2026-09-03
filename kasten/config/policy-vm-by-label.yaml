@@ -1,0 +1,26 @@
+# ALTERNATIVE targeting model - protect any VM labelled backup=hourly in the
+# demo-vms namespace. Nice for the demo: label a new VM and it self-enrols.
+# Only ONE of virtualMachineRef / virtualMachineNamespace / appNamespace may be
+# used per policy - they are mutually exclusive. Only the "In" operator is
+# supported for the VM keys.
+apiVersion: config.kio.kasten.io/v1alpha1
+kind: Policy
+metadata:
+  name: vm-label-protection
+  namespace: kasten-io
+spec:
+  comment: Protect any VM labelled backup=hourly
+  paused: true               # flip to false in the demo to show it kick in
+  frequency: '@hourly'
+  retention:
+    hourly: 24
+  actions:
+    - action: backup
+  selector:
+    matchExpressions:
+      - key: k10.kasten.io/virtualMachineNamespace
+        operator: In
+        values:
+          - "demo-vms"
+    matchLabels:
+      backup: hourly

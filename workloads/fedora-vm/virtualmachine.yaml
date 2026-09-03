@@ -1,0 +1,98 @@
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: fedora-vm
+  namespace: demo-vms
+  labels:
+    app: fedora-vm
+    backup: hourly          # picked up by policy-vm-by-label.yaml
+spec:
+  runStrategy: Always       # prefer this over the deprecated spec.running
+  template:
+    metadata:
+      labels:
+        kubevirt.io/vm: fedora-vm
+        app: fedora-vm
+      annotations:
+        kubevirt.io/allow-pod-bridge-network-live-migration: "true"
+    spec:
+      evictionStrategy: LiveMigrate
+      domain:
+        cpu:
+          cores: 2
+        memory:
+          guest: 4Gi
+        devices:
+          disks:
+            - name: rootdisk
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+            - name: podnet
+              masquerade: {}
+      networks:
+        - name: podnet
+          pod: {}
+      volumes:
+        - name: rootdisk
+          dataVolume:
+            name: fedora-vm-root
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            networkData: |
+              network:
+                version: 1
+                config:
+                  - type: physical
+                    name: eth0
+                    subnets:
+                      - type: dhcp
+            userData: |-
+              #cloud-config
+              users:
+                - name: cloud-user
+                  sudo: ['ALL=(ALL) NOPASSWD:ALL']
+                  groups: sudo
+                  shell: /bin/bash
+                  lock_passwd: false
+              # Demo console login. Change this if you like; SSH via NodePort
+              # also works once you add ssh_authorized_keys back above.
+              chpasswd:
+                expire: false
+                users:
+                  - {name: cloud-user, password: kasten-demo, type: text}
+              ssh_pwauth: true
+              packages:
+                # qemu-guest-agent is what lets Kasten freeze/thaw the guest
+                # filesystem for an APPLICATION-CONSISTENT snapshot. Without it you
+                # silently get crash-consistent instead - the job still succeeds.
+                - qemu-guest-agent
+                - httpd
+              runcmd:
+                - [ systemctl, enable, --now, qemu-guest-agent ]
+                - [ systemctl, enable, --now, httpd ]
+                - bash -c 'echo "<h1>GitOps VM - build 1</h1>" > /var/www/html/index.html'
+                - bash -c 'mkdir -p /srv/demo && date > /srv/demo/created-at.txt'
+  dataVolumeTemplates:
+    - metadata:
+        name: fedora-vm-root
+      spec:
+        storage:
+          resources:
+            requests:
+              storage: 20Gi
+          # RBD + Block + RWX is the combination KubeVirt wants:
+          #   - Ceph RBD supports multi-node access ONLY in Block volumeMode
+          #   - LiveMigration requires ReadWriteMany
+          #   - Block mode skips the filesystem layer, so the VM gets the raw device
+          # Do NOT use CephFS for VM root disks; RBD is the right pool here.
+          accessModes:
+            - ReadWriteMany
+          volumeMode: Block
+          storageClassName: ceph-block     # your Rook RBD StorageClass name
+        source:
+          http:
+            url: "https://download.fedoraproject.org/pub/fedora/linux/releases/42/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-42-1.1.x86_64.qcow2"

@@ -1,0 +1,31 @@
+# Wave 2 - Containerized Data Importer: pulls the cloud image into a PVC.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cdi
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    repoURL: REPO_URL
+    targetRevision: main
+    path: infra/cdi
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cdi
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers: ["/status"]
+    - group: cdi.kubevirt.io
+      kind: CDI
+      jsonPointers: ["/status"]

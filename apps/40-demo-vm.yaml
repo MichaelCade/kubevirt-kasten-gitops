@@ -1,0 +1,37 @@
+# Wave 5 - the VM itself. This is the "deployed via GitOps" half of the demo.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-vm
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  project: default
+  source:
+    repoURL: REPO_URL
+    targetRevision: main
+    path: workloads/fedora-vm
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-vms
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+  ignoreDifferences:
+    # KubeVirt writes runtime state and CDI mutates the DataVolume-backed PVC.
+    # Without these, selfHeal will fight KubeVirt over a running VM.
+    - group: kubevirt.io
+      kind: VirtualMachine
+      jsonPointers:
+        - /status
+        - /spec/template/metadata/annotations
+    - group: ""
+      kind: PersistentVolumeClaim
+      jsonPointers:
+        - /spec/volumeName
+        - /spec/resources/requests/storage

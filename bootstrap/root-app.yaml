@@ -1,0 +1,24 @@
+# App-of-apps root. Apply this ONCE by hand; everything else is GitOps from here.
+#   kubectl apply -f bootstrap/root-app.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: REPO_URL          # <-- replace with your Git repo
+    targetRevision: main
+    path: apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

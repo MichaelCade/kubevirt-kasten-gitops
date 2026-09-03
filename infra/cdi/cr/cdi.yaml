@@ -1,0 +1,21 @@
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: CDI
+metadata:
+  name: cdi
+spec:
+  config:
+    # Scratch space is always a FILESYSTEM PVC, even when the target disk is
+    # Block mode. ceph-block in filesystem mode is fine; ceph-filesystem also works.
+    # Whatever you pick must exist: kubectl get sc
+    scratchSpaceStorageClass: ceph-block
+    # Bumped from the defaults - the stock limits OOMKill the importer pod on
+    # anything bigger than a trivial image.
+    podResourceRequirements:
+      requests:
+        cpu: "100m"
+        memory: "60M"
+      limits:
+        cpu: "750m"
+        memory: "2Gi"
+    featureGates:
+      - HonorWaitForFirstConsumer

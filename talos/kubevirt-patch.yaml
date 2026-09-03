@@ -1,0 +1,25 @@
+# talosctl patch mc -n <node> -p @talos/kubevirt-patch.yaml
+#
+# On bare metal with VT-x/AMD-V enabled in BIOS, Talos exposes /dev/kvm with no
+# extra config - there is nothing to install for KVM itself. Verify with:
+#   kubectl get nodes -o json | jq '.items[].status.allocatable["devices.kubevirt.io/kvm"]'
+# A value of 0 or missing means virtualisation is off in BIOS, or you are nested
+# without nested-virt enabled on the outer hypervisor.
+#
+# This patch is only needed if you want a bridge for Multus-attached VMs so they
+# sit directly on your LAN instead of behind pod networking.
+machine:
+  network:
+    interfaces:
+      - interface: br0
+        addresses:
+          - 10.0.0.10/24        # <-- this node's IP
+        bridge:
+          stp:
+            enabled: true
+          interfaces:
+            - eth0              # <-- your physical NIC, check: talosctl get links
+        routes:
+          - network: 0.0.0.0/0
+            gateway: 10.0.0.1
+            metric: 1024
