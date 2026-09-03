@@ -1,0 +1,27 @@
+# Boot disk for the VM, as a standalone PVC (RBD + Block + RWX).
+#
+# Why not a CDI DataVolume/http import? On this cluster CDI's importer runs as a
+# non-root pod (UID 107, all caps dropped) and Rook's RBD block device is
+# root:root 0600 - so the importer cannot open it (fsGroupPolicy=File never
+# applies a group to *block* volumes). The VM's own virt-launcher IS privileged
+# and reads the block device fine, so the boot disk is seeded once, out-of-band,
+# by a privileged job (see hack/seed-boot-disk.sh) - the same "declared in Git,
+# contents supplied out-of-band" pattern as the Kasten S3 secret.
+#
+# Block + RWX is deliberate: RBD only does multi-node access in Block mode, and
+# LiveMigration needs RWX.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fedora-vm-root
+  namespace: demo-vms
+  labels:
+    app: fedora-vm
+spec:
+  accessModes:
+    - ReadWriteMany
+  volumeMode: Block
+  storageClassName: ceph-block
+  resources:
+    requests:
+      storage: 20Gi

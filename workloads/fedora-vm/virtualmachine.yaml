@@ -7,7 +7,9 @@ metadata:
     app: fedora-vm
     backup: hourly          # picked up by policy-vm-by-label.yaml
 spec:
-  runStrategy: Always       # prefer this over the deprecated spec.running
+  # Halted for the initial bring-up so the VM never boots a blank disk before the
+  # boot PVC is seeded (hack/seed-boot-disk.sh). Flip to Always once seeded.
+  runStrategy: Halted
   template:
     metadata:
       labels:
@@ -38,8 +40,10 @@ spec:
           pod: {}
       volumes:
         - name: rootdisk
-          dataVolume:
-            name: fedora-vm-root
+          # Boots from the standalone PVC defined in pvc.yaml, seeded once by
+          # hack/seed-boot-disk.sh (see pvc.yaml for why CDI import isn't used).
+          persistentVolumeClaim:
+            claimName: fedora-vm-root
         - name: cloudinitdisk
           cloudInitNoCloud:
             networkData: |
@@ -76,23 +80,5 @@ spec:
                 - [ systemctl, enable, --now, httpd ]
                 - bash -c 'echo "<h1>GitOps VM - build 1</h1>" > /var/www/html/index.html'
                 - bash -c 'mkdir -p /srv/demo && date > /srv/demo/created-at.txt'
-  dataVolumeTemplates:
-    - metadata:
-        name: fedora-vm-root
-      spec:
-        storage:
-          resources:
-            requests:
-              storage: 20Gi
-          # RBD + Block + RWX is the combination KubeVirt wants:
-          #   - Ceph RBD supports multi-node access ONLY in Block volumeMode
-          #   - LiveMigration requires ReadWriteMany
-          #   - Block mode skips the filesystem layer, so the VM gets the raw device
-          # Do NOT use CephFS for VM root disks; RBD is the right pool here.
-          accessModes:
-            - ReadWriteMany
-          volumeMode: Block
-          storageClassName: ceph-block     # your Rook RBD StorageClass name
-        source:
-          http:
-            url: "https://download.fedoraproject.org/pub/fedora/linux/releases/42/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-42-1.1.x86_64.qcow2"
+  # No dataVolumeTemplates: the boot disk is the standalone PVC in pvc.yaml,
+  # seeded once by hack/seed-boot-disk.sh. See pvc.yaml for the rationale.
