@@ -89,7 +89,20 @@ Point at what Kasten captured without being told: VirtualMachine, VirtualMachine
 
 ## Act 5 — Break it, restore it (5 min)
 
-The payoff. Do real damage:
+The payoff.
+
+**FIRST — pause ArgoCD auto-sync (critical).** ArgoCD has `prune + selfHeal` on, and this is an app-of-apps: if you delete the VM/PVC with sync live, ArgoCD instantly recreates a blank VM and fights the restore (and you can wedge the PVC in Terminating). You must pause the **root** app first, then `demo-vm` — pausing only the child gets reverted by root's selfHeal.
+
+```bash
+./hack/demo-pause.sh
+# equivalently:
+#   kubectl patch application.argoproj.io root    -n argocd --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}'
+#   kubectl patch application.argoproj.io demo-vm -n argocd --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}'
+```
+
+> "First I'm going to pause GitOps — because in a real recovery you want your backup tool, not your reconciler, owning the restore. Watch: I hand control to Kasten, then hand it back."
+
+Now do real damage:
 
 ```bash
 # inside the guest
@@ -97,17 +110,33 @@ sudo rm -rf /srv/demo /var/www/html/index.html
 sudo systemctl stop httpd
 ```
 
-Show the page is gone. Then destroy the whole thing:
+Show the page is gone. Then destroy the whole thing (the boot disk is a standalone PVC, not a DataVolume):
 
 ```bash
 kubectl delete vm fedora-vm -n demo-vms
-kubectl delete dv fedora-vm-root -n demo-vms
-kubectl get pvc -n demo-vms      # empty
+kubectl delete pvc fedora-vm-root -n demo-vms
+kubectl get vm,pvc -n demo-vms      # empty (ArgoCD is paused, so it stays empty)
 ```
 
-> "The VM is gone. The disk is gone. ArgoCD will happily rebuild the VM — from a stock Fedora image, with none of my data."
+> "The VM is gone. The disk is gone. And because I paused it, ArgoCD is NOT rebuilding it — there's nothing in Git that can give me my data back."
 
-Restore from Kasten (dashboard → Applications → `fedora-vm` → Restore → pick the restore point). Then:
+Restore from Kasten (dashboard → Applications → `fedora-vm` → Restore → pick the restore point).
+CLI equivalent, if you prefer:
+
+```bash
+RP=$(kubectl get restorepoints.apps.kio.kasten.io -n demo-vms \
+       --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}')
+kubectl create -f - <<EOF
+apiVersion: actions.kio.kasten.io/v1alpha1
+kind: RestoreAction
+metadata: {generateName: restore-fedora-vm-, namespace: demo-vms}
+spec:
+  subject: {apiVersion: apps.kio.kasten.io/v1alpha1, kind: RestorePoint, name: $RP, namespace: demo-vms}
+  targetNamespace: demo-vms
+EOF
+```
+
+Then:
 
 ```bash
 kubectl get vmi -n demo-vms -w
@@ -117,6 +146,14 @@ curl localhost
 ```
 
 > "Same VM. Same disk contents. Same file I typed five minutes ago."
+
+**Finally — resume ArgoCD auto-sync** and show it reconcile the restored VM cleanly (it stays in sync, because Kasten restored the same object Git declares):
+
+```bash
+./hack/demo-resume.sh
+```
+
+> "And now I give GitOps back the keys. Git owns the definition again; Kasten gave me the data. That hand-off is the whole point."
 
 ## Act 6 — The close (2 min)
 
